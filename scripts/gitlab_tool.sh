@@ -15,7 +15,7 @@ API_URL_USERS="https://$API_URL_DOMAIN/api/v4/users"
 function display_help() {
     echo "Usage: $0 -a <action> [options]"
     echo "Options:"
-    echo "  -a <action>               Action to perform: create_project, modify_user_role, modify_labels, delete_labels, create_issue, find_merge_requests, add_user_to_project, create_branch, create_merge_request, confirm_merge, get_branches, get_merged_branches, get_tags, delete_project"
+    echo "  -a <action>               Action to perform: create_project, modify_user_role, modify_labels, delete_labels, create_issue, find_merge_requests, add_user_to_project, create_branch, create_merge_request, confirm_merge, get_branches, get_merged_branches, get_tags, delete_project, add_commit_to_branch"
     echo "  -p <project_id>           ID of the project"
     echo "  -g <group_id>             ID of the group"
     echo "  -r <role>                 Role to assign to the user (for modify_user_role)"
@@ -48,7 +48,7 @@ function validate_integer() {
 
 function validate_action() {
     case $1 in
-        create_project|modify_user_role|modify_labels|delete_labels|create_issue|find_merge_requests|add_user_to_project|create_branch|create_merge_request|confirm_merge|get_branches|get_merged_branches|get_tags|delete_project) ;;
+        create_project|modify_user_role|modify_labels|delete_labels|create_issue|find_merge_requests|add_user_to_project|create_branch|create_merge_request|confirm_merge|get_branches|get_merged_branches|get_tags|delete_project|add_commit_to_branch) ;;
         *) echo "Error: Invalid action: $1"; exit 1 ;;
     esac
 }
@@ -262,6 +262,35 @@ function delete_project() {
     echo "$curl_response"
 }
 
+function add_commit_to_branch() {
+    local project_id="$1"
+    local branch_name="$2"
+    local commit_message="$3"
+    local file_path="$4"
+    local content="$5"
+
+    curl_response=$(curl -s --request POST \
+        --header "PRIVATE-TOKEN: $TOKEN" \
+        --header "Content-Type: application/json" \
+        --data @- \
+        --url "$API_URL_PROJECTS/$project_id/repository/commits" << EOF
+    {
+        "branch": "$branch_name",
+        "commit_message": "$commit_message",
+        "actions": [
+            {
+                "action": "update",
+                "file_path": "$file_path",
+                "content": "$content"
+            }
+        ]
+    }
+EOF
+    ) || handle_curl_error "$curl_response"
+
+    echo "$curl_response"
+}
+
 while getopts ":a:p:g:r:u:l:t:d:D:n:e:L:m:h" opt; do
     case $opt in
         a) action="$OPTARG" ;;
@@ -299,6 +328,7 @@ case $action in
     get_merged_branches) validate_integer "$project_id" "Project ID"; get_merged_branches "$project_id" ;;
     get_tags) validate_integer "$project_id" "Project ID"; get_tags "$project_id" ;;
     delete_project) validate_integer "$project_id" "Project ID"; delete_project "$project_id" ;;
+    add_commit_to_branch) validate_integer "$project_id" "Project ID"; add_commit_to_branch "$project_id" "$name" "$title" "README.md" "Some changes" ;;
 esac
 
 exit 0
